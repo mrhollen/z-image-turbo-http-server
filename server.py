@@ -9,6 +9,21 @@ from diffusers import DiffusionPipeline
 pipe = None
 
 class InferenceHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            try:
+                with open('index.html', 'rb') as f:
+                    content = f.read()
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html')
+                self.send_header('Content-Length', str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+            except FileNotFoundError:
+                self.send_error(404, "File not found")
+        else:
+            self.send_error(404, "Not Found")
+
     def do_POST(self):
         if self.path != '/generate':
             self.send_error(404, "Not Found")
