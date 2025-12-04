@@ -81,6 +81,47 @@
             font-style: italic;
             display: none;
         }
+
+        /* Gallery Styles */
+        #gallery-section {
+            margin-top: 3rem;
+            border-top: 1px solid #ddd;
+            padding-top: 2rem;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .gallery-item {
+            position: relative;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            aspect-ratio: 1;
+            background: #eee;
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.2s;
+        }
+
+        .gallery-item:hover img {
+            transform: scale(1.05);
+        }
+
+        .gallery-loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            grid-column: 1 / -1;
+        }
     </style>
 </head>
 
@@ -127,6 +168,14 @@
         <div id="loading" class="loading">Generating image... This may take a few seconds.</div>
 
         <div id="result"></div>
+
+        <div id="gallery-section">
+            <h2>Gallery</h2>
+            <div id="gallery-grid" class="gallery-grid">
+                <!-- Images will be loaded here -->
+            </div>
+            <div id="gallery-loading" class="gallery-loading" style="display: none;">Loading more images...</div>
+        </div>
     </div>
 
     <script>
@@ -272,6 +321,9 @@
                 result.appendChild(img);
                 result.appendChild(downloadLink);
 
+                // Refresh gallery after successful generation
+                resetGallery();
+
             } catch (err) {
                 result.innerHTML = `<div class="error">Error: ${err.message}</div>`;
             } finally {
@@ -279,6 +331,77 @@
                 loading.style.display = 'none';
             }
         }
+
+        // Gallery Logic
+        let galleryOffset = 0;
+        const galleryLimit = 20;
+        let galleryLoading = false;
+        let galleryHasMore = true;
+        const galleryGrid = document.getElementById('gallery-grid');
+        const galleryLoader = document.getElementById('gallery-loading');
+
+        async function loadGalleryImages() {
+            if (galleryLoading || !galleryHasMore) return;
+
+            galleryLoading = true;
+            galleryLoader.style.display = 'block';
+
+            try {
+                const response = await fetch(`/gallery/images?limit=${galleryLimit}&offset=${galleryOffset}`);
+                if (!response.ok) {
+                    if (response.status === 400) {
+                        // Gallery not available (save-dir not set)
+                        document.getElementById('gallery-section').style.display = 'none';
+                        return;
+                    }
+                    throw new Error('Failed to load gallery');
+                }
+
+                const data = await response.json();
+
+                data.images.forEach(filename => {
+                    const div = document.createElement('div');
+                    div.className = 'gallery-item';
+
+                    const img = document.createElement('img');
+                    img.src = `/gallery/image/${filename}`;
+                    img.loading = 'lazy';
+                    img.alt = filename;
+
+                    // Open full image on click
+                    div.onclick = () => window.open(`/gallery/image/${filename}`, '_blank');
+
+                    div.appendChild(img);
+                    galleryGrid.appendChild(div);
+                });
+
+                galleryOffset += data.images.length;
+                galleryHasMore = data.has_more;
+
+            } catch (err) {
+                console.error("Gallery error:", err);
+            } finally {
+                galleryLoading = false;
+                galleryLoader.style.display = 'none';
+            }
+        }
+
+        function resetGallery() {
+            galleryOffset = 0;
+            galleryHasMore = true;
+            galleryGrid.innerHTML = '';
+            loadGalleryImages();
+        }
+
+        // Infinite Scroll
+        window.addEventListener('scroll', () => {
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500) {
+                loadGalleryImages();
+            }
+        });
+
+        // Initial load
+        loadGalleryImages();
     </script>
 </body>
 
