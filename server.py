@@ -43,11 +43,21 @@ class InferenceHandler(http.server.BaseHTTPRequestHandler):
                 self.send_error(400, "Bad Request: Missing 'prompt' field")
                 return
 
+            width = data.get('width', 1024)
+            height = data.get('height', 1024)
+
+            # Validate resolution
+            if width % 16 != 0 or height % 16 != 0:
+                self.send_error(400, "Bad Request: Width and height must be divisible by 16")
+                return
+
             # Run inference
             # Hardcoded settings: num_inference_steps=8, guidance_scale=0.0
             image = pipe(
                 prompt=prompt,
                 num_inference_steps=8,
+                height=height,
+                width=width,
                 guidance_scale=0.0
             ).images[0]
 

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,16 +13,23 @@
             padding: 2rem;
             background: #f5f5f5;
         }
+
         .container {
             background: white;
             padding: 2rem;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
-        h1 { margin-top: 0; color: #333; }
+
+        h1 {
+            margin-top: 0;
+            color: #333;
+        }
+
         .input-group {
             margin-bottom: 1rem;
         }
+
         textarea {
             width: 100%;
             padding: 0.5rem;
@@ -31,6 +39,7 @@
             font-size: 1rem;
             box-sizing: border-box;
         }
+
         button {
             background: #007bff;
             color: white;
@@ -41,39 +50,185 @@
             cursor: pointer;
             transition: background 0.2s;
         }
-        button:hover { background: #0056b3; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
         #result {
             margin-top: 2rem;
             text-align: center;
         }
+
         img {
             max-width: 100%;
             border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
-        .error { color: #dc3545; margin-top: 1rem; }
-        .loading { color: #666; font-style: italic; display: none; }
+
+        .error {
+            color: #dc3545;
+            margin-top: 1rem;
+        }
+
+        .loading {
+            color: #666;
+            font-style: italic;
+            display: none;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Z-Image-Turbo Generator</h1>
-        
-        <div class="input-group">
-            <textarea id="prompt" placeholder="Enter your prompt here... (e.g., A futuristic city with flying cars)"></textarea>
+
+        <div class="input-group" style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+            <div style="flex: 1;">
+                <label for="width" style="display: block; margin-bottom: 0.5rem;">Width</label>
+                <input type="number" id="width" value="1024" step="16"
+                    style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <div id="width-warning" class="error" style="font-size: 0.8rem; margin-top: 0.25rem; display: none;">
+                </div>
+            </div>
+            <div style="flex: 1;">
+                <label for="height" style="display: block; margin-bottom: 0.5rem;">Height</label>
+                <input type="number" id="height" value="1024" step="16"
+                    style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <div id="height-warning" class="error" style="font-size: 0.8rem; margin-top: 0.25rem; display: none;">
+                </div>
+            </div>
+            <div style="flex: 1;">
+                <label for="arInput" style="display: block; margin-bottom: 0.5rem;">Aspect Ratio (e.g. 16:9)</label>
+                <input type="text" id="arInput" placeholder="Enter AR"
+                    style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
         </div>
-        
+        <div style="margin-bottom: 1rem; font-size: 0.9rem; color: #666;">
+            Current Aspect Ratio: <span id="arDisplay" style="font-weight: bold;">1:1</span>
+        </div>
+
+        <div class="input-group">
+            <textarea id="prompt"
+                placeholder="Enter your prompt here... (e.g., A futuristic city with flying cars)"></textarea>
+        </div>
+
         <button id="generateBtn" onclick="generateImage()">Generate Image</button>
         <div id="loading" class="loading">Generating image... This may take a few seconds.</div>
-        
+
         <div id="result"></div>
     </div>
 
     <script>
+        const widthInput = document.getElementById('width');
+        const heightInput = document.getElementById('height');
+        const arInput = document.getElementById('arInput');
+        const arDisplay = document.getElementById('arDisplay');
+        const widthWarning = document.getElementById('width-warning');
+        const heightWarning = document.getElementById('height-warning');
+
+        function validateResolution(val, elementId) {
+            const num = parseInt(val);
+            if (isNaN(num)) return null;
+
+            if (num % 16 !== 0) {
+                const closest = Math.round(num / 16) * 16;
+                const warningEl = document.getElementById(`${elementId}-warning`);
+                warningEl.textContent = `Must be divisible by 16. Closest: ${closest}`;
+                warningEl.style.display = 'block';
+                return false;
+            } else {
+                document.getElementById(`${elementId}-warning`).style.display = 'none';
+                return true;
+            }
+        }
+
+        function updateARDisplay() {
+            const w = parseInt(widthInput.value);
+            const h = parseInt(heightInput.value);
+            if (w && h) {
+                const gcd = (a, b) => b ? gcd(b, a % b) : a;
+                const divisor = gcd(w, h);
+                arDisplay.textContent = `${w / divisor}:${h / divisor} (${(w / h).toFixed(2)})`;
+            }
+        }
+
+        function parseAR(input) {
+            if (!input) return null;
+            if (input.includes(':')) {
+                const parts = input.split(':');
+                if (parts.length === 2) {
+                    const w = parseFloat(parts[0]);
+                    const h = parseFloat(parts[1]);
+                    if (w && h) return w / h;
+                }
+            }
+            const val = parseFloat(input);
+            return isNaN(val) ? null : val;
+        }
+
+        function handleDimensionChange(changedDim) {
+            const w = parseInt(widthInput.value);
+            const h = parseInt(heightInput.value);
+
+            validateResolution(w, 'width');
+            validateResolution(h, 'height');
+            updateARDisplay();
+
+            // If AR input has a value, we might want to update the other dimension
+            // But usually, changing a dimension updates the AR display, 
+            // unless the user explicitly wants to lock AR. 
+            // The requirement says: "enter a width or hight and and aspect ratio and it calculates the size of the side that wasn't entered"
+            // So this logic belongs in the AR input handler or if one dim is empty.
+        }
+
+        widthInput.addEventListener('input', () => handleDimensionChange('width'));
+        heightInput.addEventListener('input', () => handleDimensionChange('height'));
+
+        arInput.addEventListener('change', () => {
+            const ar = parseAR(arInput.value);
+            if (!ar) return;
+
+            const w = parseInt(widthInput.value);
+            const h = parseInt(heightInput.value);
+
+            // If width is present and modified recently, or if height is missing, update height
+            // Simple logic: if width exists, update height. If only height exists, update width.
+            if (w) {
+                let newH = Math.round(w / ar);
+                // Snap to 16
+                newH = Math.round(newH / 16) * 16;
+                heightInput.value = newH;
+                validateResolution(newH, 'height');
+            } else if (h) {
+                let newW = Math.round(h * ar);
+                // Snap to 16
+                newW = Math.round(newW / 16) * 16;
+                widthInput.value = newW;
+                validateResolution(newW, 'width');
+            }
+            updateARDisplay();
+        });
+
         async function generateImage() {
             const prompt = document.getElementById('prompt').value.trim();
-            if (!prompt) return;
+            const width = parseInt(widthInput.value);
+            const height = parseInt(heightInput.value);
+
+            if (!prompt) {
+                alert('Please enter a prompt');
+                return;
+            }
+
+            if (!validateResolution(width, 'width') || !validateResolution(height, 'height')) {
+                alert('Please fix resolution errors before generating.');
+                return;
+            }
 
             const btn = document.getElementById('generateBtn');
             const loading = document.getElementById('loading');
@@ -87,26 +242,27 @@
                 const response = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt })
+                    body: JSON.stringify({ prompt, width, height })
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
+                    const errText = await response.text(); // Try to get error message from server
+                    throw new Error(`Server error: ${response.status} - ${errText || response.statusText}`);
                 }
 
                 const blob = await response.blob();
                 const url = URL.createObjectURL(blob);
-                
+
                 const img = document.createElement('img');
                 img.src = url;
-                
+
                 const downloadLink = document.createElement('a');
                 downloadLink.href = url;
                 downloadLink.download = `generated-${Date.now()}.png`;
                 downloadLink.textContent = 'Download Image';
                 downloadLink.style.display = 'block';
                 downloadLink.style.marginTop = '1rem';
-                
+
                 result.appendChild(img);
                 result.appendChild(downloadLink);
 
@@ -119,4 +275,5 @@
         }
     </script>
 </body>
+
 </html>
