@@ -108,6 +108,11 @@
                 <input type="text" id="arInput" placeholder="Enter AR"
                     style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
             </div>
+            <div style="flex: 1;">
+                <label for="seed" style="display: block; margin-bottom: 0.5rem;">Seed (-1 for random)</label>
+                <input type="number" id="seed" value="-1"
+                    style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
         </div>
         <div style="margin-bottom: 1rem; font-size: 0.9rem; color: #666;">
             Current Aspect Ratio: <span id="arDisplay" style="font-weight: bold;">1:1</span>
@@ -219,6 +224,7 @@
             const prompt = document.getElementById('prompt').value.trim();
             const width = parseInt(widthInput.value);
             const height = parseInt(heightInput.value);
+            const seed = parseInt(document.getElementById('seed').value);
 
             if (!prompt) {
                 alert('Please enter a prompt');
@@ -242,7 +248,7 @@
                 const response = await fetch('/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt, width, height })
+                    body: JSON.stringify({ prompt, width, height, seed })
                 });
 
                 if (!response.ok) {
