@@ -5,15 +5,16 @@ A lightweight HTTP server for the [Tongyi-MAI/Z-Image-Turbo](https://huggingface
 ## Features
 
 - **Text-to-Image Generation**: Generate high-quality images from text prompts.
-- **Web Interface**: Simple, user-friendly HTML interface for interacting with the model.
-- **Custom Resolution**: Support for variable image dimensions (must be divisible by 16).
-- **Seed Control**: Specify a seed for reproducible generations, or use random seeds.
+- **Web Interface**: Simple HTML UI with prompt, width/height, aspect-ratio helper, and seed inputs.
+- **Custom Resolution**: Variable dimensions (must be divisible by 16). Helper warnings suggest the nearest valid size.
+- **Seed Control**: Specify a seed for reproducible generations, or use random seeds (`-1`).
 - **Low Memory Mode**: Optional CPU offload for running on GPUs with limited VRAM.
+- **Gallery**: Optional on-disk saving with an infinite-scroll gallery when `--save-dir` is provided.
 
 ## Prerequisites
 
 - Python 3.8 or higher.
-- CUDA-capable GPU (recommended) or CPU (slow).
+- CUDA-capable GPU (recommended); CPU works but is slow.
 
 ## Installation
 
@@ -38,7 +39,7 @@ A lightweight HTTP server for the [Tongyi-MAI/Z-Image-Turbo](https://huggingface
     ```
 2.  Run the server:
     ```bash
-    python server.py
+    python server.py [--port 8000] [--device cuda] [--low-mem] [--save-dir ./outputs]
     ```
 
 ### Command Line Arguments
@@ -46,10 +47,11 @@ A lightweight HTTP server for the [Tongyi-MAI/Z-Image-Turbo](https://huggingface
 - `--port`: Port to listen on (default: `8000`).
 - `--device`: Device to use (default: `cuda`).
 - `--low-mem`: Enable model CPU offload for lower VRAM usage.
+- `--save-dir`: Directory to write generated images (enables the gallery UI/endpoints).
 
 Example:
 ```bash
-python server.py --port 8080 --low-mem
+python server.py --port 8080 --low-mem --save-dir ./generated
 ```
 
 ### Using the Web UI
@@ -59,9 +61,11 @@ Once the server is running, open your web browser and navigate to:
 
 You can:
 - Enter a text prompt.
-- Adjust Width and Height.
+- Adjust Width and Height (must be divisible by 16; helper suggests the nearest valid size).
+- Optionally enter an aspect ratio (e.g., `16:9`) to auto-calculate the other dimension.
 - Set a Seed (use `-1` for random).
 - Generate and download images.
+- Scroll through saved images in the gallery when `--save-dir` is set (infinite scroll).
 
 ## API Documentation
 
@@ -81,9 +85,11 @@ Generates an image based on the provided parameters.
 | `seed` | integer | `-1` | Random seed. Set to a specific number for reproducibility. |
 
 **Response:**
-- **Success (200 OK)**: Returns the generated image as a binary PNG stream.
+- **Success (200 OK)**: Returns the generated image as a binary PNG stream. Images are also written to `--save-dir` if provided (filename format: `generated_<timestamp>_<seed>.png`).
 - **Error (400 Bad Request)**: Invalid JSON, missing prompt, or invalid resolution.
 - **Error (500 Internal Server Error)**: Server-side generation failure.
+
+**Generation settings:** `num_inference_steps=8`, `guidance_scale=0.0`, `torch_dtype=torch.bfloat16`. Seeded runs use a `torch.Generator` on the configured device.
 
 **Example `curl` Request:**
 ```bash
@@ -92,3 +98,18 @@ curl -X POST http://localhost:8000/generate \
   -d '{"prompt": "A futuristic city", "width": 512, "height": 512, "seed": 42}' \
   --output generated_image.png
 ```
+
+### `GET /gallery/images` (requires `--save-dir`)
+List saved images with pagination.
+
+**Query params:**
+- `limit` (default `20`): Max results to return.
+- `offset` (default `0`): Starting index.
+
+**Response (200 OK):**
+```json
+{ "images": ["generated_...png"], "total": 42, "has_more": true }
+```
+
+### `GET /gallery/image/<filename>` (requires `--save-dir`)
+Returns a saved image by filename (PNG). Basic filename safety checks are applied.
